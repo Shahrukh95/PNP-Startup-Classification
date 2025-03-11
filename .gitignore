@@ -1,0 +1,16 @@
+custom-env/
+.env
+*.ipynb
+*.xlsx
+*.docx
+*.csv
+*.pyc
+datasets/
+*/__pycache__/
+*/__init__.py
+Previous Results/
+Excel Files/
+All Results/
+commands.txt
+Local Input
+Local Output

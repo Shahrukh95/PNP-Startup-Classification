@@ -1,0 +1,15 @@
+new-env/
+.env
+*.ipynb
+*.xlsx
+*.docx
+*.csv
+*.pyc
+datasets/
+__pycache__/
+Previous Results/
+Excel Files/
+All Results/
+commands.txt
+Local Input
+Local Output

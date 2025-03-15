@@ -10,5 +10,6 @@ def extract_list(input_string):
             return ast.literal_eval(match.group())
         except (SyntaxError, ValueError):
             # Return an empty list if the extracted string isn't a valid Python list
+            print(f"Error extracting list from string: {input_string}")
             return []
     return []  # Return empty list

@@ -78,7 +78,7 @@ def get_full_description(web_scraper_obj, pages_content, model_name, prompts_obj
 
 
 
-def save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, web_scraper_obj, all_links, all_pages_content, full_description, all_details_dict, output_filename):
+def save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, redirected_url, web_scraper_obj, all_links, all_pages_content, full_description, all_details_dict, output_filename):
     headers = ["Startup Name", "Homepage URL", "Redirected URL (for logging only)", "Additional URLs"] + [f"Page {i+1}" for i in range(TOTAL_PAGE_CRAWLS)] + ["Full Description" ,"Short Description", "Focus Type", "Industry", "Revenue Models (Top 3)" ,"Total Token Cost ($)"]
     # Write headers if not present
     if output_sheet.max_row < 2:
@@ -91,7 +91,7 @@ def save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, web_scrape
     all_pages_content_padded = all_pages_content[:TOTAL_PAGE_CRAWLS] + [""] * (TOTAL_PAGE_CRAWLS - len(all_pages_content))
 
     # Write data
-    row = [startup_name, cleaned_url, web_scraper_obj.get_redirected_url(), urls_string] + all_pages_content_padded[:TOTAL_PAGE_CRAWLS] + [full_description, all_details_dict['short_description'],all_details_dict['focus_type'], all_details_dict['industry'], all_details_dict['revenue_model'], web_scraper_obj.get_token_cost()]
+    row = [startup_name, cleaned_url, redirected_url, urls_string] + all_pages_content_padded[:TOTAL_PAGE_CRAWLS] + [full_description, all_details_dict['short_description'],all_details_dict['focus_type'], all_details_dict['industry'], all_details_dict['revenue_model'], web_scraper_obj.get_token_cost()]
 
     output_sheet.append(row)
     output_wb.save(f"{output_filename}")  
@@ -126,7 +126,7 @@ def get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj):
 
 
 
-def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, output_wb, output_filename):
+def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet, output_sheet, output_wb, output_filename):
     # Initialize the objects
     web_scraper_obj = WebScraper()
 
@@ -135,7 +135,6 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
         startup_name = sheet.cell(row=row, column=2).value
         url = sheet.cell(row=row, column=4).value
         
-
         if pd.isnull(url):
             continue
 
@@ -148,8 +147,8 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
 
         # Load page
         web_scraper_obj.load_page()
-        # Get redirected startup url too
-        # redirected_url = web_scraper_obj.get_redirected_url()
+        # Get redirected startup url (this will be for homepage)
+        redirected_url = web_scraper_obj.get_redirected_url()
 
         # Get the content and links
         # page_content = web_scraper_obj.get_page_content(model_name)
@@ -165,7 +164,6 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
 
         chat_links_response.insert(0, web_scraper_obj.get_url())
         # print(f"All Important Links: {chat_links_response}")
-
         
         # Get the content of all the pages
         all_pages_content = get_pages_contents(web_scraper_obj, chat_links_response, model_name, content_shortener_model, prompts_obj)
@@ -178,10 +176,10 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
 
 
         # Use chat-gpt to get all details
-        chat_all_deatils_obj = ChatGPT("o3-mini", prompts_obj.get_all_details(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
+        chat_all_deatils_obj = ChatGPT(reasoning_model, prompts_obj.get_all_details(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
         chat_all_details_response, input_tokens, output_tokens = chat_all_deatils_obj.chat_model_reasoning()
         # Update token cost
-        web_scraper_obj.set_token_cost(input_tokens, output_tokens, model_name)
+        web_scraper_obj.set_token_cost(input_tokens, output_tokens, reasoning_model)
 
         
         # #use claude to get all details
@@ -195,8 +193,8 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
         json_matches = re.findall(r'"(.*?)":\s*"(.*?)"', chat_all_details_response, re.DOTALL)
         all_details_dict = dict(json_matches)
 
-
-        save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, web_scraper_obj, chat_links_response, all_pages_content, full_description, all_details_dict, output_filename)
+        
+        save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, redirected_url, web_scraper_obj, chat_links_response, all_pages_content, full_description, all_details_dict, output_filename)
 
         # --- Finishing calls ---
         # Reset token cost, redirected URL
@@ -214,7 +212,7 @@ if __name__ == "__main__":
 
     output_filename = "robotics_output.xlsx"
 
-    prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='gpt-4o-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
+    prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='gpt-4o-mini', reasoning_model='o3-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
     
 
 

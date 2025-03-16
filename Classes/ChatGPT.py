@@ -36,16 +36,15 @@ class ChatGPT():
         except Exception as e:
             print(f"API Error: {e}")
             return [None, None]
-
-
-    def risk_classification_structured_chat(self):
+        
+    def chat_model_reasoning(self):
         self.__context.append({"role": "user", "content": self.__prompt})
 
         try:
-            response = self.__client.beta.chat.completions.parse(
+            response = self.__client.chat.completions.create(
                 model=self.__model_name,
                 messages=self.__context,
-                response_format=Risk_Classification_Structure,
+                reasoning_effort="high"
             )
 
             answer = response.choices[0].message.content.strip()
@@ -59,3 +58,5 @@ class ChatGPT():
         except Exception as e:
             print(f"API Error: {e}")
             return [None, None]
+
+

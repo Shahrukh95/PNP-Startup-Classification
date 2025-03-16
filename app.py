@@ -16,7 +16,7 @@ from Utilities import *
 load_dotenv()
 
 # Constants
-TOTAL_PAGE_CRAWLS = 4
+TOTAL_PAGE_CRAWLS = 6
 
 
 
@@ -79,7 +79,7 @@ def get_full_description(web_scraper_obj, pages_content, model_name, prompts_obj
 
 
 def save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, web_scraper_obj, all_links, all_pages_content, full_description, all_details_dict, output_filename):
-    headers = ["Startup Name", "Homepage URL", "Redirected URL (for logging only)", "Additional URLs"] + [f"Page {i+1}" for i in range(TOTAL_PAGE_CRAWLS)] + ["Full Description" ,"Short Description", "Focus Type", "Industry", "Revenue Model" ,"Total Token Cost ($)"]
+    headers = ["Startup Name", "Homepage URL", "Redirected URL (for logging only)", "Additional URLs"] + [f"Page {i+1}" for i in range(TOTAL_PAGE_CRAWLS)] + ["Full Description" ,"Short Description", "Focus Type", "Industry", "Revenue Models (Top 3)" ,"Total Token Cost ($)"]
     # Write headers if not present
     if output_sheet.max_row < 2:
         output_sheet.append(headers)
@@ -120,7 +120,7 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
     web_scraper_obj = WebScraper()
 
     # sheet.max_row + 1
-    for row in range(47, 51):
+    for row in range(2, 10):
         startup_name = sheet.cell(row=row, column=2).value
         url = sheet.cell(row=row, column=4).value
         
@@ -138,10 +138,10 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
         # Load page
         web_scraper_obj.load_page()
         # Get redirected startup url too
-        redirected_url = web_scraper_obj.get_redirected_url()
+        # redirected_url = web_scraper_obj.get_redirected_url()
 
         # Get the content and links
-        page_content = web_scraper_obj.get_page_content(model_name)
+        # page_content = web_scraper_obj.get_page_content(model_name)
         page_links = web_scraper_obj.get_page_links()
 
         # # Use chat-gpt model to get relavant links (seems to be better than claude for this task)
@@ -185,7 +185,7 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
         web_scraper_obj.reset_token_cost()
         web_scraper_obj.reset_redirect_url()
 
-        # return
+
 
 
 if __name__ == "__main__":

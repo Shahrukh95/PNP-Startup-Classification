@@ -120,7 +120,7 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
     web_scraper_obj = WebScraper()
 
     # sheet.max_row + 1
-    for row in range(2, 10):
+    for row in range(2, 250):
         startup_name = sheet.cell(row=row, column=2).value
         url = sheet.cell(row=row, column=4).value
         
@@ -166,15 +166,22 @@ def prompt_approach(model_name, content_shortener_model, sheet, output_sheet, ou
         
 
 
-        # Use chat-gpt to get all details
-        chat_all_deatils_obj = ChatGPT(model_name, prompts_obj.get_all_details(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
-        chat_all_details_response, input_tokens, output_tokens = chat_all_deatils_obj.chat_model()
+        # # Use chat-gpt to get all details
+        # chat_all_deatils_obj = ChatGPT(model_name, prompts_obj.get_all_details(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
+        # chat_all_details_response, input_tokens, output_tokens = chat_all_deatils_obj.chat_model()
+        # # Update token cost
+        # web_scraper_obj.set_token_cost(input_tokens, output_tokens, model_name)
+
+        
+        #use claude to get all details
+        claude_all_details_response, input_tokens, output_tokens = claude_api(prompts_obj.get_all_details(full_description))
         # Update token cost
-        web_scraper_obj.set_token_cost(input_tokens, output_tokens, model_name)
+        web_scraper_obj.set_token_cost(input_tokens, output_tokens, "claude-3-7-sonnet-20250219")
+
 
 
         # Regular expression to extract key-value pairs from the JSON (may not be exactly valid JSON)
-        json_matches = re.findall(r'"(.*?)":\s*"(.*?)"', chat_all_details_response, re.DOTALL)
+        json_matches = re.findall(r'"(.*?)":\s*"(.*?)"', claude_all_details_response, re.DOTALL)
         all_details_dict = dict(json_matches)
 
 

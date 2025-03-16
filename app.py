@@ -131,7 +131,7 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
     web_scraper_obj = WebScraper()
 
     # sheet.max_row + 1
-    for row in range(2, sheet.max_row + 1):
+    for row in range(60, sheet.max_row + 1):
         startup_name = sheet.cell(row=row, column=2).value
         url = sheet.cell(row=row, column=4).value
         
@@ -156,14 +156,14 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
 
         # Use chat-gpt model to get relavant links (seems to be better than claude for this task)
         chat_links_response = get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj)
-        for i in range(0,6):
+        for i in range(0,10):
             if not chat_links_response:
                 print("No relavant links found. Trying again.")
                 chat_links_response = get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj)
 
 
         chat_links_response.insert(0, web_scraper_obj.get_url())
-        # print(f"All Important Links: {chat_links_response}")
+        print(f"All Important Links: {chat_links_response}")
         
         # Get the content of all the pages
         all_pages_content = get_pages_contents(web_scraper_obj, chat_links_response, model_name, content_shortener_model, prompts_obj)

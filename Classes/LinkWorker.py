@@ -58,21 +58,26 @@ class LinkWorker(Selenium):
     def page_scroller(self):
         start_time = time.time()
 
-        while True:
-            # Scroll by viewport height
-            self.__driver.execute_script("window.scrollBy(0, window.innerHeight);")
-            time.sleep(0.5)
+        try:
+            while True:
+                # Scroll by viewport height
+                self.__driver.execute_script("window.scrollBy(0, window.innerHeight);")
+                time.sleep(0.5)
 
-            # Calculate how far we have scrolled and how much is remaining
-            scrolled_height = self.__driver.execute_script("return Math.round(window.pageYOffset);")
-            total_scrollable_height = self.__driver.execute_script("return Math.round(document.body.scrollHeight);")
-            visible_height = self.__driver.execute_script("return Math.round(window.innerHeight);")
+                # Calculate how far we have scrolled and how much is remaining
+                scrolled_height = self.__driver.execute_script("return Math.round(window.pageYOffset);")
+                total_scrollable_height = self.__driver.execute_script("return Math.round(document.body.scrollHeight);")
+                visible_height = self.__driver.execute_script("return Math.round(window.innerHeight);")
 
-            elapsed_time = time.time() - start_time
+                elapsed_time = time.time() - start_time
 
-            # Break conditions: 1) We have reached the end of the page 2) Elapsed time is greater than the maximum allowed time
-            if (scrolled_height + visible_height >= total_scrollable_height - 5) or (elapsed_time > LinkWorker.MAX_TIME_SECONDS):
-                break
+                # Break conditions: 1) We have reached the end of the page 2) Elapsed time is greater than the maximum allowed time
+                if (scrolled_height + visible_height >= total_scrollable_height - 5) or (elapsed_time > LinkWorker.MAX_TIME_SECONDS):
+                    break
+
+        except Exception as e:
+            print(f"An error occurred while scrolling")
+
     
     def cookie_acceptor(self):
         cookie_button_labels = ["Accept", "Accept All", "Allow All", "Agree", "Got it", "Continue", "OK", "I Accept", "I Agree", "Allow", "Accept Cookies", "Yes, I Agree", "Akzeptieren", "Einverstanden", "Zustimmen", "Fortfahren", "Ablehnen", "Alle auswählen", "auswählen", "Alle akzeptieren", "Alles akzeptieren", "Alle ablehnen", "Zustimmen und weiter", "Alle zulassen"]
@@ -111,8 +116,15 @@ class LinkWorker(Selenium):
 
     # Retreive the innerHTML of the html tag, do not clean it
     def set_html_innerHTML(self):
-        body_element = self.__driver.find_element(By.TAG_NAME, "html")
-        self.__body_html = body_element.get_attribute("innerHTML")
+        try:
+            body_element = self.__driver.find_element(By.TAG_NAME, "html")
+            self.__body_html = body_element.get_attribute("innerHTML")
+        except NoSuchElementException:
+            print("Element with tag 'html' not found. Function: set_html_innerHTML")
+            self.__body_html = "Page Error - HTML Element not found"
+        except Exception as e:
+            print(f"Unexpected error in function: set_html_innerHTML: {e}")
+            self.__body_html = "Page Error - Unexpected Error"
 
     # Parse the HTML content into text
     def get_body_text(self):

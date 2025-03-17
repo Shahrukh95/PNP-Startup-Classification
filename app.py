@@ -131,7 +131,8 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
     web_scraper_obj = WebScraper()
 
     # sheet.max_row + 1
-    for row in range(60, sheet.max_row + 1):
+    for main_loop_index, row in enumerate(range(2, sheet.max_row + 1), start=1):
+
         startup_name = sheet.cell(row=row, column=2).value
         url = sheet.cell(row=row, column=4).value
         
@@ -201,18 +202,72 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
         web_scraper_obj.reset_token_cost()
         web_scraper_obj.reset_redirect_url()
 
+        # Reset the web scraper object after every 8 rows
+        if main_loop_index % 8 == 0:
+            web_scraper_obj.quit_driver()
+            web_scraper_obj = WebScraper()
+            print(f"Resetting the selenium driver")
+
+
+def save_to_excel_check(output_sheet, output_wb, startup_name, url, full_description, answer, web_scraper_obj, output_filename):
+    headers = ["Startup Name", "Homepage URL", "Full Description", "Is Robotics Company?", "Total Token Cost ($)"]
+    # Write headers if not present
+    if output_sheet.max_row < 2:
+        output_sheet.append(headers)
+
+    # Write data
+    row = [startup_name, url, full_description, answer, web_scraper_obj.get_token_cost()]
+
+    output_sheet.append(row)
+    output_wb.save(f"{output_filename}")  
+
+
+def check_robotic_company(model_name, reasoning_model, sheet, output_sheet, output_wb, output_filename):
+    # Initialize the objects
+    web_scraper_obj = WebScraper()
+
+    for main_loop_index, row in enumerate(range(2, sheet.max_row + 1), start=1):
+
+        startup_name = sheet.cell(row=row, column=1).value
+        url = sheet.cell(row=row, column=2).value
+        full_description = sheet.cell(row=row, column=13).value
+
+        if pd.isnull(url):
+            continue
+
+        print(f"Row {row}: {startup_name}")
+
+        prompts_obj = Prompts(TOTAL_PAGE_CRAWLS)
+    
+        chat_robotics_obj = ChatGPT(reasoning_model, prompts_obj.check_robotics(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
+        chat_robotics_response, input_tokens, output_tokens = chat_robotics_obj.chat_model()
+
+        # Update token cost
+        web_scraper_obj.set_token_cost(input_tokens, output_tokens, reasoning_model)
+
+        save_to_excel_check(output_sheet, output_wb, startup_name, url, full_description, chat_robotics_response, web_scraper_obj, output_filename)
+
+        # --- Finishing calls ---
+        # Reset token cost
+        web_scraper_obj.reset_token_cost()
+        web_scraper_obj.reset_redirect_url()
+
 
 
 
 if __name__ == "__main__":
-    startups_file = "robotics_companies.xlsx"
+    startups_file = "PNP Results.xlsx"
     sheet = load_startups_excel(startups_file)
 
     output_sheet, output_wb = create_results_file()
 
-    output_filename = "robotics_output.xlsx"
+    output_filename = "PNP Results_output.xlsx"
 
-    prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='gpt-4o-mini', reasoning_model='o3-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
+    # prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='gpt-4o-mini', reasoning_model='o3-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
+
+    check_robotic_company(model_name='chatgpt-4o-latest', reasoning_model='o3-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
+
+    
     
 
 

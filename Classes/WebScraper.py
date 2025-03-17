@@ -71,10 +71,11 @@ class WebScraper(LinkWorker):
                 self.set_url(self.__driver.current_url)
             return 200
         except TimeoutException:
-            print(f"Page load timeout: {self.__url}. Stopping page load.")
-            self.__driver.execute_script("window.stop();")  # Stop the loading
+            print(f"Page load timeout: {self.__url}.")
+            # self.__driver.execute_script("window.stop();")  # Stop the loading
+            return 0
         except Exception as e:
-            print(f"Error opening URL {self.__url}")
+            print(f"Page Error - Error opening {self.__url}")
             return 0 # General Error
 
     def quit_driver(self):
@@ -97,7 +98,6 @@ class WebScraper(LinkWorker):
                     self.set_url(current_url)  # Reset to original URL
                 else:
                     self.set_redirect_url(self.get_url())
-
 
         self.cookie_acceptor()
         self.page_scroller()

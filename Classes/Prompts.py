@@ -21,7 +21,9 @@ class Prompts():
     
 
     def get_all_details(self, full_description):
-        industries_list = f"Agriculture\nForestry\nFishing\nManufacturing\nAutomotive\nWater Supply\nFood Services\nEnergy & Environment\nWaste Management\nConstruction\nRetail Trade and E-commerce\nRepair Services\nLogistics and Supply Chain Management\nHospitality & Tourism\nTelecommunications\nFinance, Investment & Venture Capital\nInsurance\nReal Estate\nPublic Services and Administration\nDefense\nSocial Services\nEducation\nHealth\nArts, Entertainment and Recreation\nConsulting Services\nMining and Quarrying\nBiotechnology & Life Sciences\nMedia & Publishing\nCybersecurity\nAviation\nSpace Exploration\nNanotechnology\nPetrochemical\nLegal Services\nHuman Resources\nRobotics\nSports\nGaming & Esports\nEvent Management\nFashion & Apparel\nCrowdfunding & Alternative Finance\nSpiritual & Religious Services\nAnimal Care & Veterinary Services\nHome Services & Maintenance\nOther"
+        
+        # Robotics is purposely left out
+        industries_list = f"Agriculture\nForestry\nFishing\nManufacturing\nAutomotive\nWater Supply\nFood Services\nEnergy & Environment\nWaste Management\nConstruction\nRetail Trade and E-commerce\nRepair Services\nLogistics and Supply Chain Management\nHospitality & Tourism\nTelecommunications\nFinance, Investment & Venture Capital\nInsurance\nReal Estate\nPublic Services and Administration\nDefense\nSocial Services\nEducation\nHealth\nArts, Entertainment and Recreation\nConsulting Services\nMining and Quarrying\nBiotechnology & Life Sciences\nMedia & Publishing\nCybersecurity\nAviation\nSpace Exploration\nNanotechnology\nPetrochemical\nLegal Services\nHuman Resources\nSports\nGaming & Esports\nEvent Management\nFashion & Apparel\nCrowdfunding & Alternative Finance\nSpiritual & Religious Services\nAnimal Care & Veterinary Services\nHome Services & Maintenance\nOther"
 
         revenue_models = f"Product Based\nService Based\nSubscriptions\nCommissions\nLicensing\nAdvertising\nAffiliate\nFreemium\nAsset Sharing\nTraining & Workshops\nCrowdfunding\nGrants & Subsidies\nWhite & Private Labeling"
 
@@ -30,3 +32,8 @@ class Prompts():
         return all_details
 
 
+
+    def check_robotics(self, full_description):
+        robotics_prompt = f"{self.__use_english_prompt}The following is a comprehensive description of a company. Your task is to find out if the company is related to Robotics. Respond with either 'Yes' or 'No'.\n\nThe comprehensive description of the company:\n{full_description}"
+        
+        return robotics_prompt

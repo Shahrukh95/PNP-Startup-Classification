@@ -15,7 +15,6 @@ class Selenium():
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")  # Prevent shared memory issues. Also required in docker because shared memory is 64mb only in docker.
 
-
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
         chrome_options.add_argument('--window-size=1920,1080')
@@ -26,6 +25,11 @@ class Selenium():
         # chrome_options.add_argument("--disable-gpu")  # Disables GPU acceleration
         # chrome_options.add_argument("--disable-software-rasterizer")  # Further prevents GPU issues
         chrome_options.add_argument("--enable-webgl")
+
+
+        # Ignore SSL warnings
+        chrome_options.add_argument("--ignore-certificate-errors")
+        chrome_options.add_argument("--allow-insecure-localhost")
 
 
         self.__driver = webdriver.Chrome(options=chrome_options)

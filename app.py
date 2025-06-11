@@ -126,14 +126,14 @@ def get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj):
 
 
 
-def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet, output_sheet, output_wb, output_filename):
+def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet, output_sheet, output_wb, output_filename, startup_name_col):
     # Initialize the objects
     web_scraper_obj = WebScraper()
 
     # sheet.max_row + 1
     for main_loop_index, row in enumerate(range(2, sheet.max_row + 1), start=1):
 
-        startup_name = sheet.cell(row=row, column=2).value
+        startup_name = sheet.cell(row=row, column=startup_name_col).value
         url = sheet.cell(row=row, column=4).value
         
         if pd.isnull(url):
@@ -150,6 +150,9 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
         web_scraper_obj.load_page()
         # Get redirected startup url (this will be for homepage)
         redirected_url = web_scraper_obj.get_redirected_url()
+        
+        # Use redirected URL if available, otherwise use cleaned URL
+        final_url = redirected_url if redirected_url else cleaned_url
 
         # Get the content and links
         # page_content = web_scraper_obj.get_page_content(model_name)
@@ -162,7 +165,6 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
                 print("No relavant links found. Trying again.")
                 chat_links_response = get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj)
 
-
         chat_links_response.insert(0, web_scraper_obj.get_url())
         print(f"All Important Links: {chat_links_response}")
         
@@ -172,30 +174,15 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
 
         # Get the full description of the startup
         full_description = get_full_description(web_scraper_obj, all_pages_content, model_name, prompts_obj)
-        # print(f"Full Description: {full_description}\n\n\n\n")
-        
 
-
-        # Use chat-gpt to get all details
-        chat_all_deatils_obj = ChatGPT(reasoning_model, prompts_obj.get_all_details(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
-        chat_all_details_response, input_tokens, output_tokens = chat_all_deatils_obj.chat_model_reasoning()
+        # Check if it's an AI company
+        chat_ai_obj = ChatGPT(reasoning_model, prompts_obj.check_ai(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
+        chat_ai_response, input_tokens, output_tokens = chat_ai_obj.chat_model()
         # Update token cost
         web_scraper_obj.set_token_cost(input_tokens, output_tokens, reasoning_model)
 
-        
-        # #use claude to get all details
-        # claude_all_details_response, input_tokens, output_tokens = claude_api(prompts_obj.get_all_details(full_description))
-        # # Update token cost
-        # web_scraper_obj.set_token_cost(input_tokens, output_tokens, "claude-3-7-sonnet-20250219")
-
-
-
-        # Regular expression to extract key-value pairs from the JSON (may not be exactly valid JSON)
-        json_matches = re.findall(r'"(.*?)":\s*"(.*?)"', chat_all_details_response, re.DOTALL)
-        all_details_dict = dict(json_matches)
-
-        
-        save_to_excel(output_sheet, output_wb, startup_name, cleaned_url, redirected_url, web_scraper_obj, chat_links_response, all_pages_content, full_description, all_details_dict, output_filename)
+        # Save results
+        save_to_excel_check(output_sheet, output_wb, startup_name, final_url, full_description, chat_ai_response, web_scraper_obj, output_filename)
 
         # --- Finishing calls ---
         # Reset token cost, redirected URL
@@ -210,24 +197,33 @@ def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet,
 
 
 def save_to_excel_check(output_sheet, output_wb, startup_name, url, full_description, answer, web_scraper_obj, output_filename):
-    headers = ["Startup Name", "Homepage URL", "Full Description", "Is Robotics Company?", "Total Token Cost ($)"]
+    headers = ["Startup Name", "Homepage URL", "Full Description", "Is AI Startup?", "Total Token Cost ($)"]
     # Write headers if not present
     if output_sheet.max_row < 2:
         output_sheet.append(headers)
 
     # Write data
     row = [startup_name, url, full_description, answer, web_scraper_obj.get_token_cost()]
-
     output_sheet.append(row)
-    output_wb.save(f"{output_filename}")  
+    
+    # Save after each row
+    output_wb.save(output_filename)
+    print(f"Saved results for {startup_name}")
 
 
-def check_robotic_company(model_name, reasoning_model, sheet, output_sheet, output_wb, output_filename):
+def get_domain_from_email(email):
+    if pd.isnull(email):
+        return None
+    try:
+        return f"https://{email.split('@')[1]}"
+    except:
+        return None
+
+def check_ai_company(model_name, reasoning_model, sheet, output_sheet, output_wb, output_filename):
     # Initialize the objects
     web_scraper_obj = WebScraper()
 
     for main_loop_index, row in enumerate(range(2, sheet.max_row + 1), start=1):
-
         startup_name = sheet.cell(row=row, column=1).value
         url = sheet.cell(row=row, column=2).value
         full_description = sheet.cell(row=row, column=13).value
@@ -239,13 +235,13 @@ def check_robotic_company(model_name, reasoning_model, sheet, output_sheet, outp
 
         prompts_obj = Prompts(TOTAL_PAGE_CRAWLS)
     
-        chat_robotics_obj = ChatGPT(reasoning_model, prompts_obj.check_robotics(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
-        chat_robotics_response, input_tokens, output_tokens = chat_robotics_obj.chat_model()
+        chat_ai_obj = ChatGPT(reasoning_model, prompts_obj.check_ai(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
+        chat_ai_response, input_tokens, output_tokens = chat_ai_obj.chat_model()
 
         # Update token cost
         web_scraper_obj.set_token_cost(input_tokens, output_tokens, reasoning_model)
 
-        save_to_excel_check(output_sheet, output_wb, startup_name, url, full_description, chat_robotics_response, web_scraper_obj, output_filename)
+        save_to_excel_check(output_sheet, output_wb, startup_name, url, full_description, chat_ai_response, web_scraper_obj, output_filename)
 
         # --- Finishing calls ---
         # Reset token cost
@@ -256,16 +252,34 @@ def check_robotic_company(model_name, reasoning_model, sheet, output_sheet, outp
 
 
 if __name__ == "__main__":
-    startups_file = "PNP Results.xlsx"
+    startups_file = "Philip.xlsx"
     sheet = load_startups_excel(startups_file)
-
     output_sheet, output_wb = create_results_file()
-
     output_filename = "PNP Results_output.xlsx"
 
-    # prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='gpt-4o-mini', reasoning_model='o3-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
+    # Find the required columns
+    email_col = None
+    startup_name_col = None
+    for col in range(1, sheet.max_column + 1):
+        header = sheet.cell(row=1, column=col).value
+        if header == 'Email':
+            email_col = col
+        elif header == "Startups's business name":
+            startup_name_col = col
 
-    check_robotic_company(model_name='chatgpt-4o-latest', reasoning_model='o3-mini', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename)
+    if email_col is None:
+        raise ValueError("Email column not found in the Excel file")
+    if startup_name_col is None:
+        raise ValueError("Startups's business name column not found in the Excel file")
+
+    # Extract URLs from email domains
+    for row in range(2, sheet.max_row + 1):
+        email = sheet.cell(row=row, column=email_col).value
+        domain_url = get_domain_from_email(email)
+        if domain_url:
+            sheet.cell(row=row, column=4).value = domain_url  # Store URL in column 4
+
+    prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='chatgpt-4o-latest', reasoning_model='o3', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename, startup_name_col=startup_name_col)
 
     
     

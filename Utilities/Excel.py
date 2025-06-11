@@ -1,7 +1,7 @@
 import openpyxl
 
-def load_startups_excel(startups_file):
-    sheet = openpyxl.load_workbook(startups_file)["Sheet1"]
+def load_startups_excel(filename):
+    sheet = openpyxl.load_workbook(filename)["AISL2025"]
     return sheet
 
 def create_results_file():    

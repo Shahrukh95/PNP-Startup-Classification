@@ -32,6 +32,10 @@ class WebScraper(LinkWorker):
             input_cost = (input_tokens / 1000) * 0.00014
             output_cost = (output_tokens / 1000) * 0.00219
             self.__total_token_cost += input_cost + output_cost
+        elif model_name == "o3":
+            input_cost = (input_tokens / 1000) * 0.002
+            output_cost = (output_tokens / 1000) * 0.008
+            self.__total_token_cost += input_cost + output_cost
         else:
             raise ValueError("Model name not recognized. Token cost not calculated.")
 

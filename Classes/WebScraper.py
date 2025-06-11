@@ -100,12 +100,17 @@ class WebScraper(LinkWorker):
                 if status == 0:
                     print("Toggling www did not work.")
                     self.set_url(current_url)  # Reset to original URL
+                    return False  # Return False to indicate page load failed
                 else:
                     self.set_redirect_url(self.get_url())
+
+        if status == 0:
+            return False  # Return False if page load failed
 
         self.cookie_acceptor()
         self.page_scroller()
         self.set_html_innerHTML()
+        return True  # Return True if page load succeeded
 
     def get_page_content(self, model_name):
         page_content = self.scrape_page_content(model_name)

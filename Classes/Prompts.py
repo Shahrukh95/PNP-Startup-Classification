@@ -9,7 +9,7 @@ class Prompts():
         return shortened_content
 
     def startup_summary(self, pages_content_string):
-        startup_summary = f"{self.__use_english_prompt}The following are the contents of some of the pages of a company's website.\n\nYour task is to generate a comprehensive description of the company mentioning what the company is doing and how it is doing it. This should also inlcude information about is their focus more on software or hardware?, what is the specific industry this company operates in (not just by software/hardware, but in a more general sense), and what is most likely their revenue model. You can also use your own knowledge to help with this task. Do not guess the description, only use the contents and your own knowledge to generate the description. Start the description with the name of the company if its provided in the contents.\n\nContents of the pages:\n{pages_content_string}"
+        startup_summary = f"{self.__use_english_prompt}The following are the contents of some of the pages of a company's website.\n\nYour task is to generate a comprehensive description of the company with special focus on:\n1. What AI/ML technologies or capabilities they use or develop\n2. How AI/ML is integrated into their products/services\n3. Whether AI/ML is a core component of their offering\n4. The specific industry and business model\n\nStart the description with the name of the company if its provided in the contents. Be specific about AI/ML aspects - if they're not mentioned, explicitly state that.\n\nContents of the pages:\n{pages_content_string}"
 
         return startup_summary
     

@@ -35,11 +35,18 @@ def get_pages_contents(web_scraper_obj, links, model_name, content_shortener_mod
     if links is None:
         return ["Page Error - No Link Found"] * TOTAL_PAGE_CRAWLS
 
-    try:
-        # Traverse the important links
-        for link in links:
+    # Traverse the important links
+    for link in links:
+        try:
             web_scraper_obj.set_url(link)
             web_scraper_obj.load_page()
+            
+            # Check if page was loaded successfully
+            if web_scraper_obj.get_body_text() == "Page Error - HTML Element not found" or web_scraper_obj.get_body_text() == "Page Error - Unexpected Error":
+                print(f"Error accessing {link}: Page could not be loaded")
+                pages_content.append("Page Error - Could not access page")
+                continue
+                
             page_content = web_scraper_obj.get_page_content(model_name)
 
             # Shorten the content
@@ -48,11 +55,15 @@ def get_pages_contents(web_scraper_obj, links, model_name, content_shortener_mod
             web_scraper_obj.set_token_cost(input_tokens, output_tokens, content_shortener_model)
 
             pages_content.append(shortened_content)
+        except Exception as e:
+            print(f"Error accessing {link}: {str(e)}")
+            pages_content.append("Page Error - Could not access page")
 
-    
-    except Exception as e:
-        # Return error message only
-        pages_content = ["Page Error - Error in traversing link"] * TOTAL_PAGE_CRAWLS
+    # Ensure we always return TOTAL_PAGE_CRAWLS number of items
+    if len(pages_content) < TOTAL_PAGE_CRAWLS:
+        pages_content.extend(["Page Error - No additional pages found"] * (TOTAL_PAGE_CRAWLS - len(pages_content)))
+    elif len(pages_content) > TOTAL_PAGE_CRAWLS:
+        pages_content = pages_content[:TOTAL_PAGE_CRAWLS]
 
     return pages_content
 
@@ -60,19 +71,23 @@ def get_pages_contents(web_scraper_obj, links, model_name, content_shortener_mod
 # Get the full description of the startup using the list of page contents
 def get_full_description(web_scraper_obj, pages_content, model_name, prompts_obj):
     try:
+        # Check if all pages had errors
+        if all("Page Error" in content for content in pages_content):
+            return "Page Error - Could not access any pages of the website"
+
         pages_content_string = "\n\n\n\n".join(pages_content)
 
         chat_description_obj = ChatGPT(model_name, prompts_obj.startup_summary(pages_content_string), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
         chat_description_response, input_tokens, output_tokens = chat_description_obj.chat_model()
+        
         # Update token cost
         web_scraper_obj.set_token_cost(input_tokens, output_tokens, model_name)
         
+        return chat_description_response
 
     except Exception as e:
-        chat_description_response = "Page Error - Error in combining descriptions"
-
-
-    return chat_description_response
+        print(f"Error in generating full description: {str(e)}")
+        return "Page Error - Error in combining descriptions"
 
 
 
@@ -126,74 +141,89 @@ def get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj):
 
 
 
-def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet, output_sheet, output_wb, output_filename, startup_name_col):
+def prompt_approach(model_name, content_shortener_model, reasoning_model, sheet, output_sheet, output_wb, output_filename, startup_name_col, start_index, stop_index):
     # Initialize the objects
     web_scraper_obj = WebScraper()
+    prompts_obj = Prompts(TOTAL_PAGE_CRAWLS)
 
-    # sheet.max_row + 1
-    for main_loop_index, row in enumerate(range(2, sheet.max_row + 1), start=1):
-
+    # Process rows from start_index to stop_index
+    for main_loop_index, row in enumerate(range(start_index, stop_index + 1), start=1):
         startup_name = sheet.cell(row=row, column=startup_name_col).value
         url = sheet.cell(row=row, column=4).value
         
         if pd.isnull(url):
             continue
 
-        prompts_obj = Prompts(TOTAL_PAGE_CRAWLS)
-
-        # First set the URL (this cleans the URL), then get the cleaned URL
-        web_scraper_obj.set_url(url)
-        cleaned_url = web_scraper_obj.get_url()
         print(f"Row {row}: {startup_name}")
 
-        # Load page
-        web_scraper_obj.load_page()
-        # Get redirected startup url (this will be for homepage)
-        redirected_url = web_scraper_obj.get_redirected_url()
-        
-        # Use redirected URL if available, otherwise use cleaned URL
-        final_url = redirected_url if redirected_url else cleaned_url
+        try:
+            # First set the URL (this cleans the URL), then get the cleaned URL
+            web_scraper_obj.set_url(url)
+            cleaned_url = web_scraper_obj.get_url()
 
-        # Get the content and links
-        # page_content = web_scraper_obj.get_page_content(model_name)
-        page_links = web_scraper_obj.get_page_links()
+            # Load page and check if it's accessible
+            if not web_scraper_obj.load_page():
+                print(f"Website not accessible for {startup_name}")
+                save_to_excel_check(output_sheet, output_wb, startup_name, cleaned_url, 
+                                  "Page Error - Website not accessible", "No", web_scraper_obj, output_filename)
+                continue
 
-        # Use chat-gpt model to get relavant links (seems to be better than claude for this task)
-        chat_links_response = get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj)
-        for i in range(0,10):
-            if not chat_links_response:
-                print("No relavant links found. Trying again.")
+            # Get redirected startup url (this will be for homepage)
+            redirected_url = web_scraper_obj.get_redirected_url()
+            
+            # Use redirected URL if available, otherwise use cleaned URL
+            final_url = redirected_url if redirected_url else cleaned_url
+
+            # Get the content and links
+            # page_content = web_scraper_obj.get_page_content(model_name)
+            page_links = web_scraper_obj.get_page_links()
+
+            # Use chat-gpt model to get relevant links with retry logic
+            chat_links_response = get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj)
+            retry_count = 0
+            while not chat_links_response and retry_count < 10:  # Try up to 10 times
+                print(f"No relevant links found. Retry attempt {retry_count + 1}")
                 chat_links_response = get_relavant_links(web_scraper_obj, page_links, model_name, prompts_obj)
+                retry_count += 1
 
-        chat_links_response.insert(0, web_scraper_obj.get_url())
-        print(f"All Important Links: {chat_links_response}")
-        
-        # Get the content of all the pages
-        all_pages_content = get_pages_contents(web_scraper_obj, chat_links_response, model_name, content_shortener_model, prompts_obj)
-        # print(f"All Pages Content: {all_pages_content}\n\n\n\n")
+            if not chat_links_response:
+                print(f"No additional relevant links found for {startup_name} after {retry_count} attempts, proceeding with homepage only")
+                chat_links_response = [web_scraper_obj.get_url()]  # Just use the homepage
+            else:
+                chat_links_response.insert(0, web_scraper_obj.get_url())
+                print(f"All Important Links: {chat_links_response}")
+            
+            # Get the content of all the pages
+            all_pages_content = get_pages_contents(web_scraper_obj, chat_links_response, model_name, content_shortener_model, prompts_obj)
 
-        # Get the full description of the startup
-        full_description = get_full_description(web_scraper_obj, all_pages_content, model_name, prompts_obj)
+            # Get the full description of the startup
+            full_description = get_full_description(web_scraper_obj, all_pages_content, model_name, prompts_obj)
 
-        # Check if it's an AI company
-        chat_ai_obj = ChatGPT(reasoning_model, prompts_obj.check_ai(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
-        chat_ai_response, input_tokens, output_tokens = chat_ai_obj.chat_model()
-        # Update token cost
-        web_scraper_obj.set_token_cost(input_tokens, output_tokens, reasoning_model)
+            # Check if it's an AI company
+            chat_ai_obj = ChatGPT(reasoning_model, prompts_obj.check_ai(full_description), [], OpenAI(api_key=os.getenv("MY_KEY"), max_retries=5))
+            chat_ai_response, input_tokens, output_tokens = chat_ai_obj.chat_model()
+            # Update token cost
+            web_scraper_obj.set_token_cost(input_tokens, output_tokens, reasoning_model)
 
-        # Save results
-        save_to_excel_check(output_sheet, output_wb, startup_name, final_url, full_description, chat_ai_response, web_scraper_obj, output_filename)
+            # Save results
+            save_to_excel_check(output_sheet, output_wb, startup_name, final_url, full_description, chat_ai_response, web_scraper_obj, output_filename)
 
-        # --- Finishing calls ---
-        # Reset token cost, redirected URL
-        web_scraper_obj.reset_token_cost()
-        web_scraper_obj.reset_redirect_url()
+        except Exception as e:
+            print(f"Error processing {startup_name}: {str(e)}")
+            save_to_excel_check(output_sheet, output_wb, startup_name, url, 
+                              "Page Error - Unexpected error occurred", "No", web_scraper_obj, output_filename)
 
-        # Reset the web scraper object after every 8 rows
-        if main_loop_index % 8 == 0:
-            web_scraper_obj.quit_driver()
-            web_scraper_obj = WebScraper()
-            print(f"Resetting the selenium driver")
+        finally:
+            # --- Finishing calls ---
+            # Reset token cost, redirected URL
+            web_scraper_obj.reset_token_cost()
+            web_scraper_obj.reset_redirect_url()
+
+            # Reset the web scraper object after every 8 rows
+            if main_loop_index % 4 == 0:
+                web_scraper_obj.quit_driver()
+                web_scraper_obj = WebScraper()
+                print(f"Resetting the selenium driver")
 
 
 def save_to_excel_check(output_sheet, output_wb, startup_name, url, full_description, answer, web_scraper_obj, output_filename):
@@ -202,8 +232,15 @@ def save_to_excel_check(output_sheet, output_wb, startup_name, url, full_descrip
     if output_sheet.max_row < 2:
         output_sheet.append(headers)
 
+    # Handle page errors
+    if "Page Error" in full_description:
+        answer = "Uncertain"  # Set to "Uncertain" for page errors
+        token_cost = 0  # Set token cost to 0 for page errors
+    else:
+        token_cost = web_scraper_obj.get_token_cost()
+
     # Write data
-    row = [startup_name, url, full_description, answer, web_scraper_obj.get_token_cost()]
+    row = [startup_name, url, full_description, answer, token_cost]
     output_sheet.append(row)
     
     # Save after each row
@@ -272,14 +309,30 @@ if __name__ == "__main__":
     if startup_name_col is None:
         raise ValueError("Startups's business name column not found in the Excel file")
 
+    # Get start and stop indices
+    start_index = int(input("Enter start row index (default 2): ") or "2")
+    stop_index = int(input("Enter stop row index (default is last row): ") or str(sheet.max_row))
+    
+    # Validate indices
+    if start_index < 2:
+        start_index = 2
+    if stop_index > sheet.max_row:
+        stop_index = sheet.max_row
+    if start_index > stop_index:
+        raise ValueError("Start index cannot be greater than stop index")
+
+    print(f"Processing rows from {start_index} to {stop_index}")
+
     # Extract URLs from email domains
-    for row in range(2, sheet.max_row + 1):
+    for row in range(start_index, stop_index + 1):
         email = sheet.cell(row=row, column=email_col).value
         domain_url = get_domain_from_email(email)
         if domain_url:
             sheet.cell(row=row, column=4).value = domain_url  # Store URL in column 4
 
-    prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='chatgpt-4o-latest', reasoning_model='o3', sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename, startup_name_col=startup_name_col)
+    prompt_approach(model_name='chatgpt-4o-latest', content_shortener_model='chatgpt-4o-latest', reasoning_model='o3', 
+                  sheet=sheet, output_sheet=output_sheet, output_wb=output_wb, output_filename=output_filename, 
+                  startup_name_col=startup_name_col, start_index=start_index, stop_index=stop_index)
 
     
     
